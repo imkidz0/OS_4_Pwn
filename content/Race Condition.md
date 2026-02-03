@@ -1,0 +1,103 @@
+## 0. Race Condition이란 무엇인가?
+
+Race Condition은 간단히 말해
+두 개 이상의 프로세스가 공통 자원을 병행적으로 읽거나 쓰는 동작을 할 때,
+공용 데이터에 대한 접근이 **어떤 순서에 따라 이루어졌는지로 실행 결과가 달라지는 상황**이다.
+
+따라서 정확히는 기법보단 취약점이 발생하는 원인에 가깝다.
+## 1. 기법 이해를 위해 필요한 사전 지식
+
+Race Condition은 운영체제의 "동시성 모델”을 깨는 공격이므로,
+아래의 운영체제 메커니즘에 대한 이해가 필요하다:
+
+- [[Process]]
+- [[Thread]]
+- [[Context Switch]]
+- [[Interrupt]]
+- [[Page Fault]]
+- [[System Call (syscall)]]
+- [[Synchronization]]
+- [[Virtual Memory]]
+
+## 2. 운영체제 관점에서의 기법 분석
+
+상기된 문서들을 읽었다면 아마 Race Condition에 대해 감이 잡혔을 것이다.
+[[Synchronization]] 문서에서 동기화의 필요성을 설명하기 위해 들었던 예시가
+대표적인 Race Condition이 일어나는 사례이다.
+
+운영체제를 공부할 때도 Race Condition에 대해 공부할 수 있지만, 이론적인 측면에서 Race Condition에 대해 다루다 보니 이것이 악용될 수 있는 취약점임을 강조하기보다는 일종의 버그로 다루는 것 같다는 생각이 들었다.
+
+따라서 본 문서에선 Race Condition이 왜 단순한 버그로 치부하고 넘어가기엔 위험한지에 대해 해당 취약점을 공격자의 시선에서 더욱 자세히 분석하여 보고자 한다.
+
+우선 Race Condition이라는 용어는 직역하면 "경쟁 상태"라는 뜻이다.
+경쟁 상태(Race Condition)는
+두 개 이상의 프로세스 혹은 스레드가 공유 자원을 서로 사용하려고 경합(Race)하는 현상이다.
+
+여기서 우리는 정의가 아닌 "상태"에 집중해야 한다.
+Race Condition이 위험한 이유는 바로 이 경합이 "언제, 어떤 상태"에서 생기는지에 달려있다.
+
+따라서 예제로 Linux 커널에서 Race Condition으로 인해 운영체제의 권한 모델이 깨지는 과정을 직접 보며 분석해보도록 하겠다.
+
+아래는 리눅스 커널 드라이버 코드의 예시이다.
+해당 커널 드라이버는 사용자에게도 rw- 권한이 있다고 가정한다:
+```
+struct ctx {
+    char *tmp;
+};
+
+static long vuln_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+{
+    struct ctx *c = f->private_data;
+    char user_data[0x40];
+
+    if (copy_from_user(user_data, (void __user *)arg, 0x40))
+        return -EFAULT;
+
+    switch (cmd) {
+    case CMD_ALLOC:
+        c->tmp = kmalloc(0x40, GFP_KERNEL);
+        return 0;
+
+    case CMD_USE:
+        if (c->tmp)
+            memcpy(c->tmp, user_data, 0x40);
+        return 0;
+
+    case CMD_FREE:
+        kfree(c->tmp);
+        c->tmp = NULL;
+        return 0;
+    }
+    return -EINVAL;
+}
+```
+
+간단히 코드를 설명하면,
+
+- CMD_ALLOC: tmp에 kmalloc-64 SLUB 청크를 할당한 후 포인터를 tmp에 저장한다.
+- CMD_USE: tmp가 NULL이 아닐 경우, `copy_from_user()`를 통해 가져온 유저의 데이터를 해당 kmalloc-64 SLUB 청크에 쓴다.
+- CMD_FREE: tmp가 NULL이 아닐 경우, tmp를 `kfree()`한 뒤, NULL로 댕글링 포인터를 처리한다.
+
+이 코드를 단일 스레드의 관점에서 보면, 별 문제가 없어 보인다.
+kmalloc-64 SLUB 청크를 할당해주고, 쓰고, 해제한 다음, NULL 처리로 UAF를 방지한다고 생각할 수 있다.
+
+그러나 멀티 스레드의 관점에서 보면, 아주 심각한 문제가 발생한다.
+스레드 A와 스레드 B가 있고, 두 스레드가 다음과 같은 순서로 실행된다고 가정해보자:
+
+해당 상황은 CMD_ALLOC으로 tmp에 kmalloc-64 SLUB 청크가 할당된 후의 상황임을 전제한다.
+```
+Thread A: case CMD_USE로 들어가서 c->tmp를 읽는다.
+Thread B: 이때 CMD_FREE로 들어가서 kfree(c->tmp);를 실행한다.
+Thread A: memcpy(c->tmp, user_data, 0x40);을 실행한다.
+```
+이 시점에서 커널은 “c->tmp가 NULL이 아니었으므로 유효한 객체일 것”이라는 가정을 기반으로 memcpy를 수행하지만, 실제 메모리는 이미 kfree에 의해 SLUB allocator의 freelist로 반환된 상태다.
+
+kmalloc-64 SLUB의 freelist 포인터를 공격자가 원하는 커널 주소로 덮으면, 다음 `kmalloc(0x40)` 호출은 해당 주소를 반환하게 되고, 이는 곧 **임의 커널 주소에 대한 write primitive**로 이어진다.
+
+여기서 Race Condition이 정말 위험한 이유를 알 수 있다.
+**"안전하다고 믿기 쉽다"는 것이다.**
+
+코드만 검토하거나, 해당 드라이버를 단일 스레드로 테스트하면 아무 문제가 없고,
+특히, `c->tmp = NULL`도 있기 때문에 개발자는 코드가 안전하다고 믿기 쉽상이다.
+
+그러나 Race Condition을 활용할 경우, “해제 후 NULL 처리로 안전하다”는 개발자의 **가정 자체가 깨지며**, 이 코드는 **커널 객체 생명주기를 붕괴시키는 UAF 취약점**으로 변모하게 된다.

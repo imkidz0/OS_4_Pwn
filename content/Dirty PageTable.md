@@ -1,0 +1,103 @@
+## 0. Dirty PageTable이란 무엇인가?
+
+참고 자료: https://sam4k.com/page-table-kernel-exploitation/
+Dirty PageTable에 관해 qwerty(@qwerty_)님께 질문했을 때 추천해주셨던 글이다.
+이 글에선 기법에 대해서 자세히 다루기보단, 해당 기법이 동작하는 원리를 운영체제 이론 관점에서 이해하기 위한 글이므로, 기법 자체에 대한 이해가 필요하다면 해당 글을 참고하길 바란다.
+
+Dirty PageTable은 간단히 말해 **커널의 Page Table을 오염시켜, 가상주소가 가리키는 물리 메모리를 조작할 수 있게끔 만드는 기법**이다.
+
+## 1. 기법 이해를 위해 필요한 사전 지식
+
+Dirty PageTable은 본질적으로 운영체제의 메모리 구현을 응용하는 것이므로,
+기본적으로 아래의 운영체제 메커니즘에 대한 이해가 필요하다:
+
+- [[Paging]]
+- [[Page Table (1-Level Page Table)]]
+- [[Page Table Entry (PTE)]]
+- [[Virtual Memory]]
+- [[User & Kernel Space]]
+- [[Page Fault]]
+
+## 2. 운영체제 관점에서의 기법 분석
+
+Dirty PageTable은 결국 Page Table에 적혀있는 PTE 값을 변조하는 취약점이다.
+따라서 Dirty PageTable을 사용하려면, 우선 Page Table에 값을 쓸 수 있는 상황이어야 한다.
+
+일반적으로 Page Table에다가 바로 값을 쓸 수 있는 취약점은 드물다.
+문제는 여기서 발생한다.
+
+Linux 커널은 두 계층의 메모리 할당자를 사용한다:
+
+- SLUB allocator: 커널 구조체(task_struct, file, cred 등)를 할당한다.
+- Buddy allocator: 물리 페이지(4KB 단위)를 관리한다.
+
+일반적인 잘 알려진 Kernel UAF 취약점은 SLUB 객체를 덮을 수 있지만, Page Table은 SLUB이 아니라 **Buddy allocator**로 할당된다.
+
+즉, Kernel UAF 취약점은 SLUB 객체에서 발생하는데, Page Table은 **SLUB 객체에 존재하지 않으니, 값을 쓸 수가 없는 것**이다.
+
+이 문제를 해결하기 위해
+SLUB 객체가 사용하던 "페이지"를 free시켜 Buddy Allocator로 반환한 다음,
+그 페이지가 Page Table로 재사용되게끔 유도하는 과정이 필요하다.
+
+그리고 이 과정을 "Cross-Cache Attack"이라고 한다.
+
+Kernel UAF를 통해 Dirty PageTable을 수행한 문제의 풀이에 Cross-Cache Attack에 대한 내용을 다루는 것도 이 때문이다.
+즉, Cross-Cache Attack에 대한 이해가 있어야 Page Table에 값을 쓸 수 있게 되는 이유를 이해할 수 있다.
+
+Cross-Cache Attack으로 타겟 페이지를 Buddy Allocator로 돌려보냈다고 해도, 해당 페이지가 커널의 Page Table이나 다른 프로세스의 Page Table로 재사용되면 익스플로잇 프로그램에서 활용하기 힘들 것이다.
+
+따라서 예시로 익스플로잇 프로그램에서 매우 큰 전역변수를 아래와 같이 선언한다.
+```
+#define PAGE_SIZE 0x1000
+#define SPRAY_SIZE 0x1000
+
+char pages[PAGE_SPRAY_COUNT][SPRAY_PAGE_SIZE] __attribute__((aligned(0x1000)));
+```
+
+가상 메모리 사용에 따라 해당 전역변수는 아직 Page Fault가 일어나지 않은 상태이다.
+이때 페이지 사이즈 단위(PAGE_SIZE)로 임의의 값을 써서, 즉 페이지 단위로 가상 메모리에 접근해서 Page Fault를 발생시키면, 하나의 PTE가 생성된다.
+지금은 우선 Page 단위로 'A'를 썼다고 가정해보자
+
+충분히 많은 페이지에 접근하면 Page Table에 새로운 엔트리가 필요해지고, 그 수가 512개를 넘으면 새로운 Page Table 페이지가 할당된다.
+
+이때 Buddy Allocator로 돌려보낸 타겟 페이지가 수학적으로 합리적인 확률을 따라 Page Table로서 재사용될 것이라고 예상할 수 있다.
+이런 식으로 다량의 PTE 생성을 요청해 타겟 페이지가 Page Table로 재사용되게끔 유도하는 방법을 PTE Spraying이라고 한다.
+
+위 과정을 마치면 타겟 페이지에는 익스플로잇 프로그램의 전역 변수 PTE로 채워진 Page Table로 재사용된다.
+
+이제 UAF 취약점을 악용하여 타겟 페이지에 값을 쓸 수 있는 방법을 구한다.
+다양한 방법이 있지만, UAF 취약점이 존재한다면 보통 freelist 조작이 가장 직관적인 방식이다.
+freelist가 타겟 페이지의 가상 주소를 가리키게끔 유도한 뒤, 오염된 freelist가 존재하는 SLUB 객체에 맞게 할당을 요청하면 Page Table에 할당이 될 것이다.
+
+이렇게 Page Table을 오염시키는 것이 시작이다.
+
+이때 타겟 페이지의 물리 주소를 PTE로 변환한 다음, 해당 값으로 Page Table을 오염시키면,
+전역 변수에 대응되는 PTE가 "Page Table 자체"를 가리키도록 오염된다.
+
+이 부분이 조금 이해가 어려울 것으로 예상되어 조금 더 쉽게 설명해보겠다.
+정상적인 Page Table에서라면, 원래 아래의 과정으로 물리 메모리에 접근할 것이다.
+
+```
+virtual address -> PTE(PFN) -> physical page (A가 적힌 곳)
+```
+
+그러나 위의 변조 과정으로 인해 상황은 달라지게 된다.
+```
+virtual address -> PTE(PFN) -> physical page (Page Table 자체)
+```
+
+즉 가상 주소가 가리키는 물리 주소를 Page Table 자체로 변조해버리는 것이다.
+이때 이 가상 주소는 유저 공간의 익스플로잇 프로그램이 사용하는 "전역 변수의 가상 주소"이기 때문에, 유저 프로그램은 아무 제약없이 접근이 가능하다.
+
+즉, Page Table이 자기 자신을 가리키는 상황이 발생하는 것이다.
+
+이때부터 공격자는 단순히 자신의 전역변수에 접근하는 것이 곧 Page Table 자체에 대한 접근으로 바뀌기 때문에, 전역변수에서 값을 읽거나 쓸 수 있게 된다.
+Page Table을 오염시켜 다른 전역변수의 PTE가 커널 물리 메모리의 PTE를 가리키게끔 만들면,
+해당 전역 변수의 가상 주소를 읽는 행위는 "커널이 사용하는 물리 메모리의 값을 읽는 행위"가 되고, 해당 전역 변수의 가상 주소에 쓰는 행위는 "커널 물리 메모리에 값을 쓰는 행위"가 된다.
+
+즉, PTE를 변조함으로써 가상 주소 -> 임의의 물리 페이지로 매핑할 수 있게 되어, 유저 공간에서 커널 물리 메모리에 대한 Arbitrary R/W가 가능해진다.
+
+물리 페이지 단에서의 GOT Overwrite라고 이해하면 쉬울 것이다.
+
+또한 Page Table에 적힌 PTE를 변조할 수 있기 때문에, 각 페이지의 PTE flags 역시 공격자가 임의로 조작할 수 있다.
+이를 통해 원래는 읽기 전용이거나 실행 전용이던 커널 코드(.text)나 rodata 영역의 페이지에 대해 쓰기 권한을 부여할 수 있으며, 결과적으로 커널 코드나 상수 데이터까지도 수정할 수 있게 된다.
