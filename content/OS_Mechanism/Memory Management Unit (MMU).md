@@ -1,9 +1,11 @@
 
-Memory Management Unit (이하 MMU)는 가상 메모리([[Virtual Memory]]) 시스템을 구현하기 위해 사용되는 컴퓨터 하드웨어 유닛이며, ALU(Arithmetic and Logical Unit)과 같이 CPU와 통합되어 있다.
+Memory Management Unit (이하 MMU)는  
+가상 메모리([[Virtual Memory]]) 시스템을 구현하기 위해 사용되는  
+컴퓨터 하드웨어 유닛이며, CPU와 통합되어 있다.
 
-MMU는 CPU가 메모리에 접근하는 것을 총 관리하는 유닛이다.
+MMU는 CPU가 메모리에 접근하는 것을 총 관리하는 유닛이다.  
 MMU의 핵심 기능은 크게 주소 변환과 메모리 보호로 나눌 수 있다.
 
-주소 변환 과정은 [[Page Table (1-Level Page Table)]] 문서에서 자세히 설명하였고,
-메모리(페이지) 보호는 [[Page Table Entry (PTE)]] 문서에서 자세히 설명하였으므로
+주소 변환 과정은 [[Page Table (1-Level Page Table)]] 문서에서 자세히 설명하였고,  
+메모리(페이지) 보호는 [[Page Table Entry (PTE)]] 문서에서 자세히 설명하였으므로  
 본 문서에서의 자세한 설명은 생략하겠다.
