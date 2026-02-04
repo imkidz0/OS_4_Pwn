@@ -64,8 +64,8 @@ Offset = 0x8ab
 앞선 과정을 통해 가상 주소 `0x4018ab`의 VPN이 0x401임을 알 수 있었다.  
 이제 이 VPN이 어떻게 Page Table을 통해 PFN으로 매핑되는지 살펴보자.
 
-Page Table 또한 Page 단위로 관리되기 때문에,  
-`0x1000 / 0x8 = 0x200 (or 512)`  
+Page Table 또한 Page 단위로 관리되므로,
+하나의 Page Table의 Page에는 `0x1000 / 0x8 = 0x200 (or 512)`  
 즉, 512개의 PTE를 저장할 수 있다.
 
 이때, 가상 주소 `0x4018ab`의 VPN은 0x401이므로,  
