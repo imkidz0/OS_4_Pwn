@@ -1,12 +1,10 @@
 
 Page Table은 프로세스의 가상 주소 페이지를 물리 주소 프레임으로 매핑해주는 표이다.
 
-시작하기에 앞서,  
-본 문서는 Page Table의 개념을 설명하기 위해 1-Level Page Table을 기준으로 설명한다.
+설명에 앞서, 본 문서는 Page Table의 개념을 쉽게 설명하기 위해 **단일 레벨(Page Table)** 구조를 기준으로 서술한다.
 
-해당 글에 대한 이해가 끝났으면
-x86-64 OS가 사용하는 [[4-Level Page Table (Multi-Level Paging)]]에 대한 문서가 있으니  
-이어서 읽을 것을 권장한다.
+현대 x86-64 운영체제는 [[Multi-Level Page Tables]]를 사용하므로,  
+본 문서를 이해한 뒤 해당 문서를 이어서 읽는 것을 권장한다.
 
 Page Table은 다시 말하자면 페이지와 프레임의 대응 관계를 나타내는 표이다.
 ```
@@ -26,7 +24,7 @@ gef> x/12gx 0xffffa159c2a65000
 
 이때 `0x800000000e386067` 같은 값들은  
 가상 페이지를 어떤 물리 프레임에 매핑할지와  
-접근 권한을 함께 담고 있는 [[Page Table Entry (PTE)]]이다.
+접근 권한을 함께 담고 있는 [[Page Table Entry]]이다.
 
 그렇다면 Page Table은 어떻게 동작할까?
 
@@ -103,4 +101,4 @@ Physical Address = (0x000000e386 << 12) | 0x8ab = 0x000000e3868ab
 이렇게 Page Table을 통해 가상 주소 `0x00000000004018ab`는  
 물리 주소 `0x000000e3868ab`에 매핑된다는 것을 알 수 있다.
 
-이러한 주소 변환 과정은 [[Memory Management Unit (MMU)]]에서 담당한다.
+이러한 주소 변환 과정은 [[Memory Management Unit]]에서 담당한다.

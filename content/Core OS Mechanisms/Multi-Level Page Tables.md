@@ -1,5 +1,5 @@
 
-본 문서는 이미 Page Table의 개념에 대해 알고 있거나, [[Page Table (1-Level Page Table)]] 문서를 읽고 이해하였음을 전제로 하여 설명한다.
+본 문서는 이미 Page Table의 개념에 대해 알고 있거나, [[Page Table]] 문서를 읽고 이해하였음을 전제로 하여 설명한다.
 
 먼저 4-Level Page Table이 등장한 배경에 대해 이해할 필요가 있다.  
 잠시 과거의 32-bit 운영체제를 살펴보자.
@@ -42,7 +42,7 @@ Page Directory는 1024개의 Page Table을 갖고, Page Table은 다시 1024개�
 
 이러한 이유로 인해 x86-64는 전체 64비트를 전부 사용하는 대신,  
 Page Table 크기와 TLB 효율을 고려해 48비트만 사용하도록 설계되었다.  
-(TLB에 대한 자세한 설명은 [[Page Table Entry (PTE)]] 문서 참고.)
+(TLB에 대한 자세한 설명은 [[Page Table Entry]] 문서 참고.)
 
 만약 미래에 `2^48` 만큼의 가상 메모리로는 사용이 어려워지게 된다면,  
 Page Table을 한 단계 더 만들어서 `2^48 × 2^9 = 2^57`로 늘리는 설계를 채택하였다.
@@ -94,7 +94,7 @@ Linux 커널에서 사용하는 4단계 Page Table의 구조는 다음과 같다
 
 리눅스에서의 이름인 Page Table로서의 PTE와 Page Table Entry인 PTE가 혼동의 여지가 있어 설명은 CPU의 용어로 할 것이다.
 
-한 가지 주의할 점은, Linux의 하위 페이지 테이블인 PTE는 [[Page Table Entry (PTE)]]와 다르다.  
+한 가지 주의할 점은, Linux의 하위 페이지 테이블인 PTE는 [[Page Table Entry]]와 다르다.  
 표현만 PTE고, 실제로는 Page Table을 의미한다.
 
 이제 이 4단계 Page Table이 실제 가상 주소에서 어떻게 표현되는지 살펴보자.  

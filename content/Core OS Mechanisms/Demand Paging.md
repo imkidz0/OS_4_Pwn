@@ -36,7 +36,7 @@ Demand Paging은 [[Page Fault]]를 통해 동작한다.
 예시:
 - 프로그램 코드 (.text 영역)
 - 공유 라이브러리
-- [[Memory-Mapped File]]
+- [[Memory-Mapped Files]]
 
 file-backed page는 페이지의 원본이 디스크의 파일임을 의미한다.  
 따라서 RAM에서 밀려나더라도 해당 파일에서 다시 읽어오면 복구할 수 있다.

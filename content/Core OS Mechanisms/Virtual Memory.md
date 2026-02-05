@@ -4,7 +4,7 @@ Virtual Memory (가상 메모리)는 운영체제가 각 프로세스 ([[Process
 가상 메모리는 주로 페이징 ([[Paging]])을 통해 구현되며, 과거엔 Segmentation과 결합되기도 했다.
 
 CPU는 물리 메모리가 아닌 가상 주소만을 사용하며,  
-메모리 접근은 [[Memory Management Unit (MMU)]]와 [[Page Table (1-Level Page Table)]]을 통해 물리 주소로 변환된다.
+메모리 접근은 [[Memory Management Unit]]와 [[Page Table]]을 통해 물리 주소로 변환된다.
 
 그렇다면 가상 메모리를 쓰는 이유는 무엇일까?  
 가상 메모리는 운영체제의 핵심 디자인인 **메모리의 보호, 독립, 공유**를 달성한다.  

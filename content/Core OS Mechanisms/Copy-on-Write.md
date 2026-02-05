@@ -1,11 +1,11 @@
 
-Copy-on-Write(CoW)는 여러 프로세스가 같은 물리 페이지를 공유할 때,  
+Copy-on-Write (CoW)는 여러 프로세스가 같은 물리 페이지를 공유할 때,  
 **쓰기 시점에만 페이지를 복사하여 분리**하는 메커니즘이다.
 
 Copy-on-Write가 생긴 이유는 아주 단순하다.  
 "공유는 유지하고, 쓰기는 격리하기" 위해서이다.
 
-[[Memory-Mapped File]]과 [[Page Cache]] 구조에서는,  
+[[Memory-Mapped Files]]과 [[Page Cache]] 구조에서는,  
 여러 프로세스 ([[Process]])의 가상 주소 ([[Virtual Memory]])가  
 같은 Page Cache 페이지를 가리킬 수 있다.
 
@@ -41,7 +41,7 @@ CoW의 동작을 알아보기 위해, 프로세스 A와 B에서
 MMF를 `MAP_PRIVATE`로 매핑했다고 가정해보자.
 
 이때 커널은 파일의 Page Cache 페이지를 읽기 전용으로  
-각 프로세스의 PTE ([[Page Table Entry (PTE)]])에 매핑하게 된다.
+각 프로세스의 PTE ([[Page Table Entry]])에 매핑하게 된다.
 
 이 상황에서 프로세스 A가 이 페이지에 쓰기를 시도하면
 
