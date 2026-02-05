@@ -24,7 +24,6 @@ int main() {
 ```
 
 프로그램을 실행하면 기댓값인 56을 출력함을 확인할 수 있다.
-
 ```
 kidz0@kidgr4m:~/Templates$ ./test
 Result: 56
