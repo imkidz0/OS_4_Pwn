@@ -25,7 +25,7 @@ int main() {
 
 프로그램을 실행하면 기댓값인 56을 출력함을 확인할 수 있다.
 ```
-~/Templates$ ./test
+user@pwn:~/Templates$ ./test
 Result: 56
 ```
 
